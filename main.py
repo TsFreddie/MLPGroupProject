@@ -5,6 +5,20 @@ import tensorflow as tf
 import random
 import numpy as np
 import math
+from building_env import BuildingEnv
+
+building = np.array([
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.5,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.5,1.,.5,.0,.0,.0,.0],
+    [.0,.0,.0,.5,1.,.5,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.5,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+])
 
 class Memory:
     def __init__(self, max_memory):
@@ -70,8 +84,10 @@ BATCH_SIZE = 32
 TAU = 0.08
 RANDOM_REWARD_STD = 1.0
 
-env = gym.make("CartPole-v0")
-state_size = 4
+env = gym.make("AirRaid-ram-v0")
+# env = BuildingEnv(building)
+state_size = building.shape[0] * building.shape[1]
+print(state_size)
 num_actions = env.action_space.n
 
 primary_network = keras.Sequential([
