@@ -1,6 +1,7 @@
 import gym
 import numpy as np
 from gym import spaces
+import tkinter as tk
 
 DIRS = [
     np.array([0, -1]),
@@ -10,6 +11,7 @@ DIRS = [
 ]
 
 eps = 1e-5
+UNIT = 40   # pixels
 
 # class Dummy():
 #     def __init__(self, r, c):
@@ -31,10 +33,26 @@ class BuildingEnv(gym.Env):
         self.dummy_bound = np.array(building.shape)
         self.building = building
 
+    # def _create_render(self):
+    #     height = self.building.shape[0]
+    #     width = self.building.shape[1]
+
+    #     self.canvas = tk.Canvas(self, bg='white',
+    #                        height=height * UNIT,
+    #                        width=width * UNIT)
+
+    #     # create grids
+    #     for c in range(0, width * UNIT, UNIT):
+    #         x0, y0, x1, y1 = c, 0, c, width * UNIT
+    #         self.canvas.create_line(x0, y0, x1, y1)
+    #     for r in range(0, height * UNIT, UNIT):
+    #         x0, y0, x1, y1 = 0, r, width * UNIT, r
+    #         self.canvas.create_line(x0, y0, x1, y1)
+
     def reset(self):
         self.grid = self.building
         self.current_step = 0
-        self.max_step = 100
+        self.max_step = 1000
         self.id = 0
         self.reward = 0
         
@@ -48,8 +66,12 @@ class BuildingEnv(gym.Env):
         # 2 - south
         # 3 - west
         
-        self.reward -= 1
+        # self.reward -= 1
+        reward = -1
         self.current_step += 1
+
+        done = self.current_step >= self.max_step
+
         self.dummies = self.dummies + DIRS[action] * 0.5
         # if (not (tmp[0] < 0 or tmp[1] < 0 or tmp[0] > self.dummy_bound[0] or tmp[1] > self.dummy_bound[1])):
         #     self.dummies = tmp
@@ -64,15 +86,15 @@ class BuildingEnv(gym.Env):
 
         index = np.floor(self.dummies)
         
-        self.reward -= self.grid[int(index[0])][int(index[1])]
+        reward -= self.grid[int(index[0])][int(index[1])]
         if (np.array_equal(index, np.array(self.grid.shape) - np.ones(2))):
-            self.reward += 20
+            done = True
+            reward += 40
         
-        return self.grid, self.reward, self.current_step >= self.max_step, {}
+        return self.grid, reward, done, {}
 
-    def render(self, mode='human', close=False):
-        print(self.current_step)
-        print(self.dummies)
+    def render(self, mode='human'):
+        pass
         
 
     

@@ -84,10 +84,13 @@ BATCH_SIZE = 32
 TAU = 0.08
 RANDOM_REWARD_STD = 1.0
 
-env = gym.make("AirRaid-ram-v0")
-# env = BuildingEnv(building)
-state_size = building.shape[0] * building.shape[1]
+# env = gym.make("CartPole-v0")
+env = BuildingEnv(building)
+print(env.observation_space)
+state_size = env.observation_space.shape[0] * env.observation_space.shape[1]
+# state_size = 4
 print(state_size)
+
 num_actions = env.action_space.n
 
 primary_network = keras.Sequential([
@@ -112,14 +115,16 @@ double_q = False
 steps = 0
 for i in range(num_episodes):
     state = env.reset()
-    cnt = 0
+    state = state.flatten()
+    rewards = 0
     avg_loss = 0
     while True:
         if render:
             env.render()
         action = choose_action(state, primary_network, eps)
         next_state, reward, done, info = env.step(action)
-        reward = np.random.normal(1.0, RANDOM_REWARD_STD)
+        next_state = next_state.flatten()
+        # reward = np.random.normal(1.0, RANDOM_REWARD_STD)
         if done:
             next_state = None
         # store in memory
@@ -131,10 +136,10 @@ for i in range(num_episodes):
         steps += 1
         eps = MIN_EPSILON + (MAX_EPSILON - MIN_EPSILON) * math.exp(-LAMBDA * steps)
         if done:
-            avg_loss /= cnt
-            print(f"Episode: {i}, Reward: {cnt}, avg loss: {avg_loss:.3f}, eps: {eps:.3f}")
+            avg_loss /= rewards
+            print(f"Episode: {i}, rewards: {rewards}, avg loss: {avg_loss:.3f}, eps: {eps:.3f}")
             with train_writer.as_default():
-                tf.summary.scalar('reward', cnt, step=i)
+                tf.summary.scalar('reward', rewards, step=i)
                 tf.summary.scalar('avg loss', avg_loss, step=i)
             break
-        cnt += 1
+        rewards += reward
