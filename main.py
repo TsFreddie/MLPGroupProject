@@ -1,100 +1,33 @@
-import gym
-import datetime as dt
-import random
+#import gym
 import numpy as np
-import math
 from building_env import BuildingEnv
 from agent import Agent
 
 building = np.array([
-    [.0,.0,.1,.1,.1,.1,.1,.1,.1,.1],
-    [.0,.0,.0,.1,.1,.1,.1,.1,.1,.1],
-    [.1,.0,.0,.0,.1,.1,.1,.1,.1,.1],
-    [.1,.1,.0,.0,.0,.1,.1,.1,.1,.1],
-    [.1,.1,.1,.0,.0,.0,.1,.1,.1,.1],
-    [.1,.1,.1,.1,.0,.0,.0,.1,.1,.1],
-    [.1,.1,.1,.1,.1,.0,.0,.0,.1,.1],
-    [.1,.1,.1,.1,.1,.1,.0,.0,.0,.1],
-    [.1,.1,.1,.1,.1,.1,.1,.0,.0,.0],
-    [.1,.1,.1,.1,.1,.1,.1,.1,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [5.,5.,5.,5.,5.,5.,5.,5.,5.,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,5.,5.,5.,5.,5.,5.,5.,5.,5.],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [5.,5.,5.,5.,5.,5.,5.,5.,5.,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,5.,5.,5.,5.,5.,5.,5.,5.,5.],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
+    [.0,.0,.0,.0,.0,.0,.0,.0,.0,.0],
 ])
 
-# class Memory:
-#     def __init__(self, max_memory):
-#         self._max_memory = max_memory
-#         self._samples = []
-#     def add_sample(self, sample):
-#         self._samples.append(sample)
-#         if len(self._samples) > self._max_memory:
-#             self._samples.pop(0)
-#     def sample(self, no_samples):
-#         if no_samples > len(self._samples):
-#             return random.sample(self._samples, len(self._samples))
-#         else:
-#             return random.sample(self._samples, no_samples)
-#     @property
-#     def num_samples(self):
-#         return len(self._samples)
-
-# def choose_action(state, primary_network, eps):
-#     if random.random() < eps:
-#         return random.randint(0, num_actions - 1)
-#     else:
-#         return np.argmax(primary_network(state.reshape(1, -1)))
-
-# def train(primary_network, memory, target_network=None):
-#     if memory.num_samples < BATCH_SIZE * 3:
-#         return 0
-#     batch = memory.sample(BATCH_SIZE)
-#     states = np.array([val[0] for val in batch])
-#     actions = np.array([val[1] for val in batch])
-#     rewards = np.array([val[2] for val in batch])
-#     next_states = np.array([(np.zeros(state_size)
-#                                 if val[3] is None else val[3]) for val in batch])
-#     # predict Q(s,a) given the batch of states
-#     prim_qt = primary_network(states)
-#     # predict Q(s',a') from the evaluation network
-#     prim_qtp1 = primary_network(next_states)
-#     # copy the prim_qt into the target_q tensor - we then will update one index corresponding to the max action
-#     target_q = prim_qt.numpy()
-#     updates = rewards
-#     valid_idxs = np.array(next_states).sum(axis=1) != 0
-#     batch_idxs = np.arange(BATCH_SIZE)
-#     if target_network is None:
-#         updates[valid_idxs] += GAMMA * np.amax(prim_qtp1.numpy()[valid_idxs, :], axis=1)
-#     else:
-#         prim_action_tp1 = np.argmax(prim_qtp1.numpy(), axis=1)
-#         q_from_target = target_network(next_states)
-#         updates[valid_idxs] += GAMMA * q_from_target.numpy()[batch_idxs[valid_idxs], prim_action_tp1[valid_idxs]]
-#     target_q[batch_idxs, actions] = updates
-#     loss = primary_network.train_on_batch(states, target_q)
-#     if target_network is not None:
-#         # update target network parameters slowly from primary network
-#         for t, e in zip(target_network.trainable_variables, primary_network.trainable_variables):
-#             t.assign(t * (1 - TAU) + e * TAU)
-#     return loss
-
-STORE_PATH = '.'
-MAX_EPSILON = 1
-MIN_EPSILON = 0.01
-LAMBDA = 0.0005
-GAMMA = 0.95
-BATCH_SIZE = 32
-TAU = 0.08
-RANDOM_REWARD_STD = 1.0
-
-env = gym.make('CartPole-v0')
+env = BuildingEnv(building)
 agent = Agent(env.observation_space, env.action_space)
 
 num_episodes = 1000
 render = True
 
-steps = 0
 for i in range(num_episodes):
     state = env.reset()
-
+    steps = 0
     rewards = 0
-    avg_loss = 0
+    episode_loss = 0
+
     while True:
         if render:
             env.render()
@@ -102,17 +35,17 @@ for i in range(num_episodes):
         action = agent.action(state)
         next_state, reward, done, info = env.step(action)
 
-        # store in memory
         agent.experience(state, action, reward, next_state, done)
 
-        history = agent.train(32)
+        steps += 1
+        episode_loss += agent.train(32)
 
         state = next_state
-        # exponentially decay the eps value
-        steps += 1
 
         rewards += reward
 
         if done:
-            print(f"Episode: {i}, rewards: {rewards}")
             break
+    
+    avg_loss = episode_loss / steps
+    print(f"Episode: {i}, rewards: {rewards}, steps: {steps}, avg_loss: {avg_loss}")

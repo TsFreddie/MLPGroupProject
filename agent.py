@@ -17,7 +17,7 @@ class Agent:
                  eps_decay = 0.995,
                  saved_model = None):
         
-        self.observation_shape = observation_space.shape
+        self.observation_size = np.product(observation_space.shape)
         self.action_space = action_space
 
         if (isinstance(action_space, spaces.Discrete)):
@@ -44,8 +44,8 @@ class Agent:
 
     def Model(self):
         model = keras.models.Sequential()
-        model.add(keras.layers.Dense(50, input_shape=self.observation_shape, activation='relu'))
-        model.add(keras.layers.Dense(50, activation='relu'))
+        model.add(keras.layers.Dense(30, input_dim=self.observation_size, activation='relu'))
+        model.add(keras.layers.Dense(30, activation='relu'))
         model.add(keras.layers.Dense(self.action_size, activation='linear'))
         
         model.compile(optimizer=keras.optimizers.Adam(lr=self.lr), loss='mse')
@@ -56,6 +56,8 @@ class Agent:
         self.model.save(name)
 
     def experience(self, state, action, reward, next_state, done):
+        state = state.flatten()
+        next_state = next_state.flatten()
         self.memory.append((state, action, reward, next_state, done))
 
 # def choose_action(state, primary_network, eps):
@@ -75,21 +77,25 @@ class Agent:
     
     def train(self, batch):
         if (batch >= len(self.memory)):
-            return None
+            return 0
 
         samples = random.sample(self.memory, batch)
 
-        for state, action, reward, next_state, done in samples:
-            state_flatten = state.reshape(1, -1)
-            state_qvs = self.model.predict(state_flatten)
+        states = np.array([val[0] for val in samples])
+        actions = np.array([val[1] for val in samples])
+        rewards = np.array([val[2] for val in samples])
+        next_states = np.array([val[3] for val in samples])
+        valid = np.array([not val[4] for val in samples])
+        indexes = np.arange(batch)
 
-            if done:
-                state_qvs[0][action] = reward
-            else:
-                next_qvs = self.model.predict(next_state.reshape(1, -1))
-                state_qvs[0][action] = reward + self.gamma * np.amax(next_qvs)
+        target_qvs = self.model(states).numpy()
+        next_qvs = self.model(next_states).numpy()
 
-            history = self.model.fit(x=state_flatten, y=state_qvs, verbose=0, epochs=1)
+        rewards[valid] += self.gamma * np.amax(next_qvs[valid, :], axis=1)
+        
+        target_qvs[indexes, actions] = rewards
+
+        history = self.model.train_on_batch(states, target_qvs)
         
         if (self.eps >= self.min_eps):
             self.eps *= self.eps_decay

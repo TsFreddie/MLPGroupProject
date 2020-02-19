@@ -11,16 +11,11 @@ DIRS = [
 ]
 
 eps = 1e-5
+
 UNIT = 40   # pixels
 
-# class Dummy():
-#     def __init__(self, r, c):
-#         self.r = r
-#         self.c = c
-#     def move(self, direction):
-#         pass
 class BuildingEnv(gym.Env):
-    # np array [n*m*2] - [smoke value]
+    # np array [n*m*2] - [smoke value, population]
     def __init__(self, building):
         super(BuildingEnv, self).__init__()
 
@@ -28,7 +23,7 @@ class BuildingEnv(gym.Env):
         # self.lower_bound = np.ones(building.shape) * np.array([0])
         # self.higher_bound = np.ones(building.shape) * np.array([1, 3])
         # print(self.lower_bound)
-        self.observation_space = spaces.Box(low=0, high=1, shape=building.shape, dtype=np.float16)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(np.product(building.shape) * 2 + 2, ), dtype=np.float32)
 
         self.dummy_bound = np.array(building.shape)
         self.building = building
@@ -51,13 +46,14 @@ class BuildingEnv(gym.Env):
 
     def reset(self):
         self.grid = self.building
+        self.history = np.zeros(self.building.shape)
         self.current_step = 0
-        self.max_step = 1000
+        self.max_step = 200
         self.id = 0
         self.reward = 0
         
         self.dummies = np.array([0, 0])
-        return self.grid
+        return np.concatenate((self.grid.flatten(), self.history.flatten(), self.dummies))
     
     def step(self, action):
         # action:
@@ -67,12 +63,12 @@ class BuildingEnv(gym.Env):
         # 3 - west
         
         # self.reward -= 1
-        reward = -1
+        reward = -0.05
         self.current_step += 1
 
         done = self.current_step >= self.max_step
 
-        self.dummies = self.dummies + DIRS[action] * 0.5
+        self.dummies = self.dummies + DIRS[action]
         # if (not (tmp[0] < 0 or tmp[1] < 0 or tmp[0] > self.dummy_bound[0] or tmp[1] > self.dummy_bound[1])):
         #     self.dummies = tmp
         if (self.dummies[0] < 0):
@@ -86,12 +82,13 @@ class BuildingEnv(gym.Env):
 
         index = np.floor(self.dummies)
         
-        reward -= self.grid[int(index[0])][int(index[1])]
+        reward -= (self.grid[int(index[0])][int(index[1])] + self.history[int(index[0])][int(index[1])] * 0.01)
+        self.history[int(index[0])][int(index[1])] += 1
         if (np.array_equal(index, np.array(self.grid.shape) - np.ones(2))):
             done = True
-            reward += 40
+            reward += 1
         
-        return self.grid, reward, done, {}
+        return np.concatenate((self.grid.flatten(), self.history.flatten(), self.dummies)), reward, done, {}
 
     def render(self, mode='human'):
         pass
