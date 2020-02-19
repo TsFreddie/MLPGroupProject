@@ -126,23 +126,23 @@ class GridBuildingEnv(gym.Env):
         if (point in self.signs_loc):
             direction = self.signs_value[self.signs_loc.index(point)]
             if (direction == 0):
-                return -1 + self.flood((point[0] - 1, point[1]), path)
+                return -0.005 + self.flood((point[0] - 1, point[1]), path)
             elif (direction == 1):
-                return -1 + self.flood((point[0], point[1] + 1), path)
+                return -0.005 + self.flood((point[0], point[1] + 1), path)
             elif (direction == 2):
-                return -1 + self.flood((point[0] + 1, point[1]), path)
+                return -0.005 + self.flood((point[0] + 1, point[1]), path)
             elif (direction == 3):
-                return -1 + self.flood((point[0], point[1] - 1), path)
+                return -0.005 + self.flood((point[0], point[1] - 1), path)
         
         if (point in self.exits):
-            return 500
+            return 0.1
     
         return (
-            -1 + 
-            self.flood((point[0] - 1, point[1]), path) + 
-            self.flood((point[0], point[1] + 1), path) +
-            self.flood((point[0] + 1, point[1]), path) +
-            self.flood((point[0], point[1] - 1), path)
+            -0.005 + 
+            self.flood((point[0] - 1, point[1]), path) if point[0] - 1 >= 0 else 0 + 
+            self.flood((point[0], point[1] + 1), path) if point[1] + 1 < self.width else 0 +
+            self.flood((point[0] + 1, point[1]), path) if point[0] + 1 < self.height else 0 +
+            self.flood((point[0], point[1] - 1), path) if point[1] - 1 >= 0 else 0
         )
 
     def step(self, action):
@@ -155,13 +155,13 @@ class GridBuildingEnv(gym.Env):
 
         self.total_reward += rewards
 
-        done = False
-        if (self.total_reward > self.width + self.height * len(self.starting_points) * 10):
-            done = True
+        # done = False
+        # if (self.total_reward > self.width + self.height * len(self.starting_points) * 10):
+        #     done = True
 
-        return self._get_obs(), rewards, done, {}
+        return self._get_obs(), rewards, True, {}
 
-    def render(self):
+    def render(self, mode='human'):
         if ("root" not in self.visual):
             self._pg_create_window()
 
