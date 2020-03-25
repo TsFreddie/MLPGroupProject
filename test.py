@@ -22,11 +22,11 @@ building = np.array(
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], # 2
       [0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], # 3
       [0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], # 4
-      [0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1], # 5
-      [0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1], # 6
+      [0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], # 5
+      [0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], # 6
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], # 7
-      [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1], # 8
-      [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1], # 9
+      [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1], # 8
+      [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1], # 9
       [0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1], # A
   ], dtype=np.int8
 )
@@ -42,7 +42,7 @@ exits = [(0x0,0x0), (0x0,0x3), (0x0,0xB), (0xA,0xE), (0xA,0x8), (0xA,0x0)]
 
 # starts = [(2,2)]
 # exits = [(0,0)]
-env = GridBuildingEnv(building=building, starting_points=starts, exits=exits)
+env = GridBuildingEnv(building=building, exits=exits)
 env = Monitor(env, log_dir, allow_early_resets=True)
 
 
@@ -89,24 +89,48 @@ def debug():
     # Returning False will stop training early
 #     return True
 
-def train_run(steps=10000, save="model"):  
+def train(steps=10000, savefile="model"):  
   model = PPO2(MlpPolicy, env, verbose=1)
   model.learn(total_timesteps=steps)
 
   result = plot_results([log_dir], steps, X_TIMESTEPS, "Exit Route")
   
-  model.save('model')
-  plt.savefig('train_2_plot.pdf')
-  # obs = env.reset()
-  # total_rewards = 0
-  # for i in range(1000):
-  #     action, _states = model.predict(obs)
-  #     obs, reward, done, info = env.step(action)
-  #     # total_rewards += reward
-  #     print(f"Rewards: {reward}, Steps: {i}")
-  #     # if (done):
-  #     #     break
-  #     env.render()
-  # env.close()
+  model.save(savefile)
+  plt.savefig('train_new_plot.pdf')
+  obs = env.reset()
+  total_rewards = 0
+  for i in range(1000):
+      action, _states = model.predict(obs)
+      obs, reward, done, info = env.step(action)
+      # total_rewards += reward
+      print(f"Rewards: {reward}, Steps: {i}")
+      # if (done):
+      #     break
+      env.render()
+  env.close()
 
-train_run(15000)
+def run(savefile='model'):
+  model = PPO2.load(savefile)
+  obs = env.reset()
+  total_rewards = 0
+  steps = 0
+  while True:
+    action, _states = model.predict(obs)
+    obs, reward, done, info = env.step(action)
+    env.render()
+    steps += 1
+    total_rewards += reward
+    print(f"Rewards: {reward}, Steps: {steps}", end='')
+    if input().strip() == 'q':
+        break
+
+    if (done):
+      print(f'total_rewards: {total_rewards}')
+      env.reset()
+      steps = 0
+      total_rewards = 0
+
+  input("Press enter to exit.")
+  env.close()
+
+train(8000)

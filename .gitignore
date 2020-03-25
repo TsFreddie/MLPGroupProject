@@ -137,3 +137,7 @@ DoubleQ_*
 
 # vscode settings
 .vscode/
+
+# log and models
+log/**/*
+models/**/*

@@ -24,10 +24,11 @@ class GridBuildingEnv(gym.Env):
             # width = None,
             # height = None,
             building = None,
-            starting_points = None,
             exits = None):
         
         super(GridBuildingEnv, self).__init__()
+
+        self.hallspace = []
 
         if (building is not None):
             self.building = building
@@ -40,7 +41,6 @@ class GridBuildingEnv(gym.Env):
         else:
             raise ValueError("Invalid GridBuildingStructure")
         
-        self.starting_points = [] if starting_points is None else starting_points
         self.exits = [] if exits is None else exits
 
         self.signs_loc = []
@@ -51,6 +51,7 @@ class GridBuildingEnv(gym.Env):
             for j in range(self.width):
                 if (self.building[i][j] != 0):
                     continue
+                self.hallspace.append((i, j))
                 cross = 0
                 if (i > 0 and self.building[i-1][j] == 0):
                     cross += 1
@@ -74,14 +75,14 @@ class GridBuildingEnv(gym.Env):
         self.sensor = np.zeros(self.building.shape)
         self.signs_value = np.zeros(self.nsign, dtype=int)
 
+        initial_fire_position = self.exits[np.random.randint(len(self.exits))]
+        self.sensor[initial_fire_position[0]][initial_fire_position[1]] = 1.
+
         self.total_reward = 0
         return self._get_obs()
 
     def setState(self, r, c, state = 1):
         self.building[r][c] = state
-    
-    def addStartingPoint(self, point):
-        self.starting_points.append(point)
     
     def addExit(self, point):
         self.exits.append(point)
@@ -111,9 +112,12 @@ class GridBuildingEnv(gym.Env):
         obs = np.concatenate([self.sensor.flatten()])
         return obs
 
-    def flood(self, point, path):
+    def flood(self, point, path, wall_penalty=False):
         if (point[0] < 0 or point[1] < 0 or point[0] >= self.height or point[1] >= self.width):
-            return 0
+            if (wall_penalty):
+                return 0
+            else:
+                return 0
 
         if (self.building[point[0]][point[1]] == 1):
             return 0
@@ -123,31 +127,54 @@ class GridBuildingEnv(gym.Env):
 
         path.add(point)
 
+        step_rewards = -0.0001 - self.sensor[point[0]][point[1]] * 0.1
+
         if (point in self.signs_loc):
             direction = self.signs_value[self.signs_loc.index(point)]
             if (direction == 0):
-                return -0.005 + self.flood((point[0] - 1, point[1]), path)
+                return step_rewards + self.flood((point[0] - 1, point[1]), path, True)
             elif (direction == 1):
-                return -0.005 + self.flood((point[0], point[1] + 1), path)
+                return step_rewards + self.flood((point[0], point[1] + 1), path, True)
             elif (direction == 2):
-                return -0.005 + self.flood((point[0] + 1, point[1]), path)
+                return step_rewards + self.flood((point[0] + 1, point[1]), path, True)
             elif (direction == 3):
-                return -0.005 + self.flood((point[0], point[1] - 1), path)
+                return step_rewards + self.flood((point[0], point[1] - 1), path, True)
         
         if (point in self.exits):
             return 0.1
     
         return (
-            -0.005 + 
-            self.flood((point[0] - 1, point[1]), path) if point[0] - 1 >= 0 else 0 + 
-            self.flood((point[0], point[1] + 1), path) if point[1] + 1 < self.width else 0 +
-            self.flood((point[0] + 1, point[1]), path) if point[0] + 1 < self.height else 0 +
-            self.flood((point[0], point[1] - 1), path) if point[1] - 1 >= 0 else 0
+            step_rewards + 
+            self.flood((point[0] - 1, point[1]), path) +
+            self.flood((point[0], point[1] + 1), path) +
+            self.flood((point[0] + 1, point[1]), path) +
+            self.flood((point[0], point[1] - 1), path)
         )
 
     def step(self, action):
         self.signs_value = action
         
+        new_sensor = self.sensor.copy()
+
+        # Fire Spread
+        for point in self.hallspace:
+            if (point[0] - 1 >= 0):
+                new_sensor[point[0]][point[1]] += self.sensor[point[0] - 1][point[1]] * 0.01
+            if (point[1] + 1 < self.width):
+                new_sensor[point[0]][point[1]] += self.sensor[point[0]][point[1] + 1] * 0.01
+            if (point[0] + 1 < self.height):
+                new_sensor[point[0]][point[1]] += self.sensor[point[0] + 1][point[1]] * 0.01
+            if (point[1] - 1 >= 0):
+                new_sensor[point[0]][point[1]] += self.sensor[point[0]][point[1] - 1] * 0.01
+            if (new_sensor[point[0]][point[1]] > 1.):
+                new_sensor[point[0]][point[1]] = 1.
+
+        done = False
+
+        self.sensor = new_sensor
+        if (self.sensor.sum() >= len(self.hallspace) * 0.75):
+            done = True
+
         rewards = 0
         for point in self.signs_loc:
             path = set()
@@ -155,11 +182,7 @@ class GridBuildingEnv(gym.Env):
 
         self.total_reward += rewards
 
-        # done = False
-        # if (self.total_reward > self.width + self.height * len(self.starting_points) * 10):
-        #     done = True
-
-        return self._get_obs(), rewards, True, {}
+        return self._get_obs(), rewards, done, {}
 
     def render(self, mode='human'):
         if ("root" not in self.visual):
@@ -175,6 +198,8 @@ class GridBuildingEnv(gym.Env):
         for i in range(self.height):
             for j in range(self.width):      
                 if (self.building[i][j] == 0):
+                    alpha = 255 * (1 - self.sensor[i][j])
+                    pygame.draw.rect(screen, (255, alpha, alpha), (j * size, i * size, size, size))
                     pygame.draw.rect(screen, BLACK, (j * size, i * size, size, size), 1)
                 else:
                     pygame.draw.rect(screen, BLACK, (j * size, i * size, size, size), 0)
@@ -182,13 +207,9 @@ class GridBuildingEnv(gym.Env):
         for point in self.exits:
             pygame.draw.rect(screen, GREEN, (point[1] * size + 4, point[0] * size + 4, rect_size, rect_size), 0)
 
-        # for point in self.starting_points:
-        #     pygame.draw.circle(screen, BLUE,
-        #             (point[1] * size + size // 2, point[0] * size + size // 2), dot_size, 0)
-
         for i in range(len(self.signs_loc)):
             point = self.signs_loc[i]
-            pygame.draw.polygon(screen, RED, ARROWS[self.signs_value[i]]
+            pygame.draw.polygon(screen, BLUE, ARROWS[self.signs_value[i]]
                  + np.array((point[1] * size + size // 2, point[0] * size + size // 2)))
 
         pygame.display.flip()
